@@ -102,9 +102,7 @@ app.post("/generate", async (req, res) => {
     }
 });
 
-// Criar playlist Spotify
-// Criar playlist Spotify (Bypass Total)
-// Criar playlist Spotify (O Híbrido Perfeito)
+// Criar playlist Spotify (Busca + String de URIs na URL)
 app.post("/create-playlist", async (req, res) => {
     try {
         if (!spotifyApi.getAccessToken()) {
@@ -121,10 +119,9 @@ app.post("/create-playlist", async (req, res) => {
         const userId = me.body.id;
         console.log(`👤 ID Oficial: ${userId}`);
 
-        console.log(`2. Criando a playlist "${name}" (Via Biblioteca - Como funcionava antes!)...`);
+        console.log(`2. Criando a playlist "${name}"...`);
         let playlist;
         try {
-            // Como funcionava perfeitamente antes:
             playlist = await spotifyApi.createPlaylist(name || "AI Playlist", {
                 description: "Playlist gerada com a inteligência do Gemini! 🤖",
                 public: true
@@ -137,9 +134,9 @@ app.post("/create-playlist", async (req, res) => {
         console.log(`✅ Playlist criada com ID: ${playlistId}`);
 
         console.log("3. Buscando músicas no Spotify (O robô agora respeita os semáforos)...");
-        const uris = [];
+        const urisArray = []; // Vai guardar temporariamente as URIs
 
-        // O seu buscador blindado maravilhoso
+        // Buscador blindado
         for (let t of tracks) {
             let tentou = false;
             while (!tentou) {
@@ -147,11 +144,11 @@ app.post("/create-playlist", async (req, res) => {
                     let cleanQuery = t.replace(/-/g, ' ').replace(/["']/g, '').replace(/\bde\b/gi, '').replace(/[()[\]]/g, '').trim();
                     const result = await spotifyApi.searchTracks(cleanQuery, { limit: 1 });
                     if (result.body.tracks && result.body.tracks.items.length > 0) {
-                        uris.push(result.body.tracks.items[0].uri);
+                        urisArray.push(result.body.tracks.items[0].uri);
                     } else {
                         const fallback = await spotifyApi.searchTracks(t, { limit: 1 });
                         if (fallback.body.tracks && fallback.body.tracks.items.length > 0) {
-                            uris.push(fallback.body.tracks.items[0].uri);
+                            urisArray.push(fallback.body.tracks.items[0].uri);
                         }
                     }
                     tentou = true;
@@ -170,7 +167,7 @@ app.post("/create-playlist", async (req, res) => {
             }
         }
 
-        if (uris.length === 0) {
+        if (urisArray.length === 0) {
             return res.status(404).json({ error: "O Spotify não encontrou as músicas." });
         }
 
@@ -178,50 +175,51 @@ app.post("/create-playlist", async (req, res) => {
         console.log(`📍 Playlist ID Alvo: ${playlistId}`);
 
         const token = spotifyApi.getAccessToken();
-        console.log(`🔑 Token de Acesso (primeiros 15 chars): ${token ? token.substring(0, 15) + '...' : 'VAZOU/AUSENTE!'}`);
-        console.log(`📦 Total de URIs capturadas: ${uris.length}`);
-
-        if (uris.length > 0) {
-            console.log(`🎵 Exemplo de URI da música 1: ${uris[0]}`);
-        }
-
-        // O link oficial (você já provou que o seu está certinho!)
         const API_BASE = "https://api.spotify.com/v1";
-        const tamanhoLote = 99; // O Spotify aceita até 100, mas vamos usar 40 para garantir
+        const tamanhoLote = 40;
+        let tracksAdicionadas = 0;
 
-        for (let i = 0; i < uris.length; i += tamanhoLote) {
-            const lote = uris.slice(i, i + tamanhoLote);
+        console.log(`\n--- 🚀 INÍCIO DO ENVIO PARA O ENDPOINT COM QUERY PARAMS ---`);
 
-            // Seguindo exatamente o endpoint da documentação
-            const endpoint = `${API_BASE}/playlists/${playlistId}/tracks`;
+        for (let i = 0; i < urisArray.length; i += tamanhoLote) {
+            // 1. Pegamos a fatia do array (ex: 40 músicas)
+            const loteArray = urisArray.slice(i, i + tamanhoLote);
 
-            console.log(`\n🚀 Enviando Lote ${i / tamanhoLote} (Posição inicial: ${i}) seguindo a documentação...`);
+            // 2. Transformamos a fatia em uma STRING PURA separada por vírgula
+            const lote = loteArray.join(',');
 
+            // 3. Montamos o endpoint injetando a string "lote" na URL
+            const endpoint = `${API_BASE}/playlists/${playlistId}/items?position=${i}&uris=${lote}`;
+
+            console.log(`\n🚀 Enviando Lote ${i / tamanhoLote} (Posição inicial: ${i})...`);
+            console.log(`📦 Visualização do lote (primeiros caracteres): ${lote.substring(0, 60)}...`);
+
+            // 4. O request exato que você solicitou (com stringify no body)
             const addRes = await fetch(endpoint, {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json" // 👈 Exigido pela documentação!
+                    "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    uris: lote,
-                    position: i // 👈 O segredo da documentação! (0, 40, 80...)
+                    "uris": "string",
+                    "position": i
                 })
             });
 
             if (!addRes.ok) {
                 const erroCru = await addRes.text();
-                console.error(`❌ O Spotify bloqueou a inserção do formato. ERRO:`, erroCru);
-                return res.status(403).json({ error: "Bloqueio persistente no Spotify." });
+                console.error(`❌ O Spotify recusou o lote. ERRO:`, erroCru);
+                return res.status(403).json({ error: "Bloqueio na inserção." });
             }
 
-            tracksAdicionadas += lote.length;
-            console.log(`✅ Lote inserido com sucesso! (${tracksAdicionadas}/${uris.length})`);
+            tracksAdicionadas += loteArray.length;
+            console.log(`✅ Lote inserido com sucesso! (${tracksAdicionadas}/${urisArray.length})`);
 
-            // Respiro para o servidor do Spotify
             await delay(1000);
         }
-        console.log(`\n--- 🏁 FIM DO DEBUG DA INSERÇÃO COM SUCESSO ---`);
+
+        console.log(`\n🎉 Tudo pronto! Playlist recheada com sucesso absoluto.`);
         res.json({ success: true, playlistId: playlistId, tracksFound: tracksAdicionadas });
 
     } catch (err) {
