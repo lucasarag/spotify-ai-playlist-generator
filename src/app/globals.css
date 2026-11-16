@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #ecebf4;
+  --color-panel: #ffffff;
+  --color-ink: #19152e;
+  --color-muted: #625c7c;
+  --color-line: #d5d1e4;
+  --color-ultra: #4636f0;
+  --color-ultra-deep: #2f22c4;
+  --color-ultra-soft: #e3e0fd;
+  --color-flare: #ff5a36;
+  --color-ok: #17845a;
+  --color-danger: #c2302b;
+
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ultra);
+  outline-offset: 2px;
+}
+
+/* Equalizer: the one recurring motion, marking a tool that is working right now. */
+@keyframes eq {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+.eq-bar {
+  transform-origin: bottom;
+  animation: eq 0.9s ease-in-out infinite;
+}
+.eq-bar:nth-child(2) { animation-delay: -0.3s; }
+.eq-bar:nth-child(3) { animation-delay: -0.6s; }
+@media (prefers-reduced-motion: reduce) {
+  .eq-bar { animation: none; transform: scaleY(0.7); }
+}
+
+/* Assistant markdown */
+.md > * + * { margin-top: 0.65em; }
+.md ul { list-style: disc; padding-left: 1.25em; }
+.md ol { list-style: decimal; padding-left: 1.4em; }
+.md li + li { margin-top: 0.2em; }
+.md strong { font-weight: 600; }
+.md a { color: var(--color-ultra); text-decoration: underline; text-underline-offset: 2px; }
+.md code { font-size: 0.9em; background: var(--color-ultra-soft); padding: 0.1em 0.3em; border-radius: 4px; }
+.md h1, .md h2, .md h3 { font-family: var(--font-display); font-weight: 600; line-height: 1.2; }
